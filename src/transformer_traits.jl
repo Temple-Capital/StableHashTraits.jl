@@ -40,19 +40,24 @@ end
 ##### Type Hashes
 #####
 
-"""
-    hash_type!(hash_state, context, T)
-
-Hash type `T` in the given context, updating `hash_state`.
-"""
-function hash_type!(hash_state, context, ::Type{T}) where {T}
+function _hash_type!(hash_state, context, ::Type{T}) where {T}
     type_context = TypeHashContext(context)
     transform = transformer(typeof(T), type_context)
     tT = transform(T)
     hash_type_state = similar_hash_state(hash_state)
     hash_type_state = stable_hash_helper(tT, hash_type_state, type_context,
                                          hash_trait(transform, tT))
-    bytes = reinterpret(UInt8, asarray(compute_hash!(hash_type_state)))
+    return compute_hash!(hash_type_state)
+end
+
+"""
+    hash_type!(hash_state, context, T)
+
+Hash type `T` in the given context, updating `hash_state`.
+"""
+function hash_type!(hash_state, context, ::Type{T}) where {T}
+    digest = _hash_type!(hash_state, context, T)
+    bytes = reinterpret(UInt8, asarray(digest))
 
     return update_hash!(hash_state, bytes)
 end
