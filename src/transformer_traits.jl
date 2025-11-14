@@ -385,7 +385,7 @@ end
 
 function stable_hash_helper(str, hash_state, context, ::StructTypes.StringType)
     nested_hash_state = start_nested_hash!(hash_state)
-    update_hash!(nested_hash_state, str isa AbstractString ? str : string(str))
+    nested_hash_state = update_hash!(nested_hash_state, str isa AbstractString ? str : string(str))
     return end_nested_hash!(hash_state, nested_hash_state)
 end
 
