@@ -166,15 +166,20 @@ function internal_type_structure(::Type{T}, trait::StructTypes.DataType) where {
     end
 end
 
-function stable_hash_helper(x, hash_state, context, st::StructTypes.DataType)
+function stable_hash_helper_nested(f!, hash_state)
     nested_hash_state = start_nested_hash!(hash_state)
-
-    # hash the field values
-    fields = st isa StructTypes.UnorderedStruct ? sorted_field_names(x) :
-             fieldnames(typeof(x))
-    nested_hash_state = hash_fields(x, fields, nested_hash_state, context)
+    nested_hash_state = f!(nested_hash_state)
     hash_state = end_nested_hash!(hash_state, nested_hash_state)
     return hash_state
+end
+
+function stable_hash_helper(x, hash_state, context, st::StructTypes.DataType)
+    return stable_hash_helper_nested(hash_state) do nested_hash_state
+        # hash the field values
+        fields = st isa StructTypes.UnorderedStruct ? sorted_field_names(x) :
+                fieldnames(typeof(x))
+        hash_fields(x, fields, nested_hash_state, context)
+    end
 end
 
 Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
@@ -272,14 +277,11 @@ function split_union(array::AbstractArray{Union{N,M}}) where {N,M}
 end
 
 function stable_hash_helper(xs, hash_state, context, ::StructTypes.ArrayType)
-    nested_hash_state = start_nested_hash!(hash_state)
-
-    items = !is_ordered(xs) ? sort!(collect(xs); by=hash_sort_by) : xs
-    transform = transformer(eltype(items), context)::Transformer
-    nested_hash_state = hash_elements(items, nested_hash_state, context, transform)
-
-    hash_state = end_nested_hash!(hash_state, nested_hash_state)
-    return hash_state
+    return stable_hash_helper_nested(hash_state) do nested_hash_state
+        items = !is_ordered(xs) ? sort!(collect(xs); by=hash_sort_by) : xs
+        transform = transformer(eltype(items), context)::Transformer
+        hash_elements(items, nested_hash_state, context, transform)
+    end
 end
 
 function hash_elements(items, hash_state, context, transform)
@@ -325,10 +327,9 @@ function internal_type_structure(::Type{T}, ::StructTypes.ArrayType) where {T<:N
 end
 
 function stable_hash_helper(x::Tuple, hash_state, context, ::StructTypes.ArrayType)
-    nested_hash_state = start_nested_hash!(hash_state)
-    nested_hash_state = hash_fields(x, fieldnames(typeof(x)), nested_hash_state, context)
-    hash_state = end_nested_hash!(hash_state, nested_hash_state)
-    return hash_state
+    return stable_hash_helper_nested(hash_state) do nested_hash_state
+        nested_hash_state = hash_fields(x, fieldnames(typeof(x)), nested_hash_state, context)
+    end
 end
 
 #####
@@ -349,19 +350,17 @@ end
 hash_trait(::Pair) = StructTypes.OrderedStruct()
 
 function stable_hash_helper(x, hash_state, context, ::StructTypes.DictType)
-    pairs = StructTypes.keyvaluepairs(x)
-    nested_hash_state = start_nested_hash!(hash_state)
+    return stable_hash_helper_nested(hash_state) do nested_hash_state
+        pairs = StructTypes.keyvaluepairs(x)
 
-    pairs = if is_ordered(x)
-        StructTypes.keyvaluepairs(x)
-    else
-        sort!(collect(StructTypes.keyvaluepairs(x)); by=hash_sort_by ∘ first)
+        pairs = if is_ordered(x)
+            StructTypes.keyvaluepairs(x)
+        else
+            sort!(collect(StructTypes.keyvaluepairs(x)); by=hash_sort_by ∘ first)
+        end
+        transform = transformer(eltype(x), context)::Transformer
+        hash_elements(pairs, nested_hash_state, context, transform)
     end
-    transform = transformer(eltype(x), context)::Transformer
-    hash_elements(pairs, nested_hash_state, context, transform)
-
-    hash_state = end_nested_hash!(hash_state, nested_hash_state)
-    return hash_state
 end
 
 #####
@@ -384,9 +383,9 @@ function transformer(::Type{<:Symbol}, ::HashVersion{4})
 end
 
 function stable_hash_helper(str, hash_state, context, ::StructTypes.StringType)
-    nested_hash_state = start_nested_hash!(hash_state)
-    nested_hash_state = update_hash!(nested_hash_state, str isa AbstractString ? str : string(str))
-    return end_nested_hash!(hash_state, nested_hash_state)
+    return stable_hash_helper_nested(hash_state) do nested_hash_state
+        update_hash!(nested_hash_state, str isa AbstractString ? str : string(str))
+    end
 end
 
 function stable_hash_helper(number::T, hash_state, context,
