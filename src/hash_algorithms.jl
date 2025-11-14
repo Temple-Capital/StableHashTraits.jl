@@ -101,6 +101,9 @@ end
 compute_hash!(x::RecursiveHashState) = x.val
 similar_hash_state(x::RecursiveHashState) = RecursiveHashState(x.fn, x.init, x.init)
 
+start_nested_hash!(x::RecursiveHashState) = x
+end_nested_hash!(root::RecursiveHashState, x::RecursiveHashState) = x
+
 #####
 ##### BufferedHashState: wrapper that buffers bytes before passing them to the hash algorithm
 #####
