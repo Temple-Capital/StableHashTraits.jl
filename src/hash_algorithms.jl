@@ -94,8 +94,9 @@ function RecursiveHashState(fn)
     hash = fn(UInt8[])
     return RecursiveHashState(fn, hash, hash)
 end
-function update_hash!(hasher::RecursiveHashState, bytes::AbstractVector{UInt8})
-    return RecursiveHashState(hasher.fn, hasher.fn(bytes, hasher.val), hasher.init)
+function update_hash!(hasher::RecursiveHashState, bytes)
+    hasher.val = hasher.fn(bytes, hasher.val)
+    return hasher
 end
 compute_hash!(x::RecursiveHashState) = x.val
 similar_hash_state(x::RecursiveHashState) = RecursiveHashState(x.fn, x.init, x.init)
