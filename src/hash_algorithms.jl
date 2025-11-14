@@ -85,7 +85,7 @@ function HashState(fn::Function, context)
     return BufferedHashState(RecursiveHashState(fn))
 end
 
-struct RecursiveHashState{F,T} <: HashState
+mutable struct RecursiveHashState{F,T} <: HashState
     fn::F
     val::T
     init::T
