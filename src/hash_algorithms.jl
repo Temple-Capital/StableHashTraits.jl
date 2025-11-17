@@ -167,6 +167,6 @@ end
 ##### RecursiveHashState: handles a function of the form hash64(bytes, [old_hash])
 #####
 
-function HashState(fn::Function, context, size = HASH_BUFFER_SIZE)
+function HashState(fn, context, size = HASH_BUFFER_SIZE)
     return BufferedHashState(RecursiveHashState(fn), size)
 end
