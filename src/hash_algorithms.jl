@@ -63,8 +63,8 @@ for fn in filter(startswith("sha") ∘ string, names(SHA))
     if CTX in names(SHA)
         # we cheat a little here, technically `SHA_CTX` and friends are not `HashState`
         # but we make them satisfy the same interface below
-        @eval function HashState(::typeof(SHA.$(fn)), context)
-            return BufferedHashState(SHA.$(CTX)())
+        @eval function HashState(::typeof(SHA.$(fn)), context, size=HASH_BUFFER_SIZE)
+            return BufferedHashState(SHA.$(CTX)(), size)
         end
     end
 end
@@ -76,14 +76,6 @@ function update_hash!(sha::SHA.SHA_CTX, bytes::AbstractVector{UInt8})
 end
 compute_hash!(sha::SHA.SHA_CTX) = SHA.digest!(sha)
 similar_hash_state(::T) where {T<:SHA.SHA_CTX} = T()
-
-#####
-##### RecursiveHashState: handles a function of the form hash64(bytes, [old_hash])
-#####
-
-function HashState(fn::Function, context)
-    return BufferedHashState(RecursiveHashState(fn))
-end
 
 mutable struct RecursiveHashState{F,T} <: HashState
     fn::F
@@ -169,4 +161,12 @@ function compute_hash!(x::BufferedHashState)
 end
 function similar_hash_state(x::BufferedHashState)
     return BufferedHashState(similar_hash_state(x.content_hash_state), x.limit)
+end
+
+#####
+##### RecursiveHashState: handles a function of the form hash64(bytes, [old_hash])
+#####
+
+function HashState(fn::Function, context, size = HASH_BUFFER_SIZE)
+    return BufferedHashState(RecursiveHashState(fn), size)
 end
