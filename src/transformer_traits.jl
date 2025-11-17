@@ -382,6 +382,10 @@ function transformer(::Type{<:Symbol}, ::HashVersion{4})
     return Transformer(String; hoist_type=true)
 end
 
+function transformer(::Type{<:Union{BigInt, BigFloat}}, ::HashVersion{4})
+    return Transformer(string; hoist_type=true)
+end
+
 function stable_hash_helper(str, hash_state, context, ::StructTypes.StringType)
     return stable_hash_helper_nested(hash_state) do nested_hash_state
         update_hash!(nested_hash_state, str isa AbstractString ? str : string(str))
