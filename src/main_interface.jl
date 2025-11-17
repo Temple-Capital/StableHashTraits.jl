@@ -41,9 +41,16 @@ The `context` value gets passed as the second argument to [`transformer`](@ref),
 
 [`transformer`](@ref)
 """
-stable_hash(x; version, alg=sha256) = stable_hash(x, HashVersion{version}(); alg)
-function stable_hash(x, context; alg=sha256)
-    hash_state = hash_type_and_value(x, HashState(alg, context), context)
+function stable_hash(x; version, alg=sha256, buffer_size=nothing)
+    stable_hash(x, HashVersion{version}(); alg, buffer_size)
+end
+function stable_hash(x, context; alg=sha256, buffer_size=nothing)
+    state = if isnothing(buffer_size)
+        HashState(alg, context)
+    else
+        HashState(alg, context, buffer_size)
+    end
+    hash_state = hash_type_and_value(x, state, context)
     return compute_hash!(hash_state)
 end
 
