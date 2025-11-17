@@ -50,9 +50,9 @@ function stable_hash(x, context; alg=sha256, buffer_size=nothing)
     else
         HashState(alg, context, buffer_size)
     end
-    stable_hash!(x, state::HashState, context)
+    stable_hash!(x, state, context)
 end
-function stable_hash!(x, state::HashState, context)
+function stable_hash!(x, state, context)
     hash_state = hash_type_and_value(x, state, context)
     return compute_hash!(hash_state)
 end
