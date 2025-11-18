@@ -54,6 +54,17 @@ as `state`
 """
 function similar_hash_state end
 
+"""
+    context_hash_state(fn)
+
+Return the initial hash state for the given hash function `fn`. By default, we assume that the hash function `fn` is applied
+recursively as `fn(x, old_hash)`, and so we use `RecursiveHashState` to handle it.
+A hash function of the form `fn(bytes)` should provide its own implementation of this method.
+"""
+function context_hash_state end
+
+context_hash_state(fn) = RecursiveHashState(fn)
+
 #####
 ##### SHA Hashing: support use of `sha256` and related hash functions
 #####
@@ -63,9 +74,7 @@ for fn in filter(startswith("sha") ∘ string, names(SHA))
     if CTX in names(SHA)
         # we cheat a little here, technically `SHA_CTX` and friends are not `HashState`
         # but we make them satisfy the same interface below
-        @eval function HashState(::typeof(SHA.$(fn)), context, size=HASH_BUFFER_SIZE)
-            return BufferedHashState(SHA.$(CTX)(), size)
-        end
+        @eval StableHashTraits.context_hash_state(::typeof(SHA.$(fn))) = SHA.$(CTX)()
     end
 end
 
@@ -168,5 +177,5 @@ end
 #####
 
 function HashState(fn, context, size = HASH_BUFFER_SIZE)
-    return BufferedHashState(RecursiveHashState(fn), size)
+    return BufferedHashState(context_hash_state(fn), size)
 end
