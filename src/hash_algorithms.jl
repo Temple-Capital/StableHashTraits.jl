@@ -91,9 +91,8 @@ mutable struct RecursiveHashState{F,T} <: HashState
     val::T
     init::T
 end
-function RecursiveHashState(fn)
-    hash = fn(UInt8[])
-    return RecursiveHashState(fn, hash, hash)
+function RecursiveHashState(fn, init=fn(UInt8[]))
+    return RecursiveHashState(fn, init, init)
 end
 function update_hash!(hasher::RecursiveHashState, bytes)
     hasher.val = hasher.fn(bytes, hasher.val)
