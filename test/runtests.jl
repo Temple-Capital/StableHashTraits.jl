@@ -394,6 +394,23 @@ include("setup_tests.jl")
     end # for
 end # @testset
 
+@testset "Blake3Hash" begin
+    state = StableHashTraits.BufferedHashState(Blake3Ctx())
+    h = StableHashTraits.stable_hash!(3, state, HashVersion{4}()) |> bytes2hex
+    @test h == "4ec535ab065ced0ffa292dec3b0d937843ad4eea4bc1842f56c53f2a3ff5e1da"
+
+    struct A
+       a::Int
+       b::Float64
+       c::String
+    end
+
+    a = A(1,2.0,"c")
+    state = StableHashTraits.BufferedHashState(Blake3Ctx())
+    h = StableHashTraits.stable_hash!(a, state, HashVersion{4}()) |> bytes2hex
+    @test h == "2fd2220cf6cdc2ae4c73c8e2947b6c31b95c2dc77710d2ac1f5c74b138555ca7"
+end
+
 @testset "Aqua" begin
     # NOTE: aqua incorrectly flags the split_union method as having unbound type arguments
     Aqua.test_all(StableHashTraits; unbound_args=(; broken=true))

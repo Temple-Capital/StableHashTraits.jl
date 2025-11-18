@@ -1,6 +1,7 @@
 using StableHashTraits
 using ReferenceTests
 using Aqua
+using Blake3Hash
 using Test
 using Dates
 using UUIDs
