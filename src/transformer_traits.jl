@@ -61,7 +61,11 @@ function hash_type!(hash_state, context, ::Type{T}) where {T}
 
     return update_hash!(hash_state, bytes)
 end
-asarray(x) = [x]
+if VERSION >= v"1.11"
+    asarray(x) = setindex!(Memory{typeof(x)}(undef, 1), x, 1)
+else
+    asarray(x) = [x]
+end
 asarray(x::AbstractArray) = x
 
 struct TypeHashContext{T}
