@@ -57,7 +57,7 @@ Hash type `T` in the given context, updating `hash_state`.
 """
 function hash_type!(hash_state, context, ::Type{T}) where {T}
     digest = _hash_type!(hash_state, context, T)
-    bytes = reinterpret(UInt8, asarray(digest))
+    bytes = copy(reinterpret(UInt8, asarray(digest)))
 
     return update_hash!(hash_state, bytes)
 end

@@ -180,3 +180,9 @@ end
 struct NumberTypeB
     x::Int
 end
+
+struct SimpleStruct
+    a::Int
+    b::Float64
+    c::String
+end
