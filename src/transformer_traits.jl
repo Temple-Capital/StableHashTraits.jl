@@ -30,15 +30,6 @@ TraversalStyle(::Type{<:BottomUpTraversalContext}) = BottomUpTraversal()
 # how we hash when we haven't hoisted the type hash out of a loop
 hash_type_and_value(x, hash_state, context) = hash_type_and_value(x, hash_state, context, TraversalStyle(context))
 
-function hash_type!(hash_state, context, x, tx, hoist_type::Bool)
-    hash_state = if hoist_type
-        hash_type!(hash_state, context, typeof(x))
-    else
-        hash_type!(hash_state, context, typeof(tx))
-    end
-    return hash_state
-end
-
 function hash_type_and_value(x, hash_state, context, ::TopDownTraversal)
     transform = transformer(typeof(x), context)::Transformer
     tx = transform(x)
@@ -93,9 +84,17 @@ function type_digest(::Type{T}, hash_state, context) where {T}
     transform = transformer(typeof(T), type_context)
     tT = transform(T)
     hash_type_state = similar_hash_state(hash_state)
-    hash_type_state = stable_hash_helper(tT, hash_type_state, type_context,
-                                         hash_trait(transform, tT))
+    hash_type_state = hash_value(tT, hash_type_state, type_context, transform; tx = tT)
     return compute_hash!(hash_type_state)
+end
+
+function hash_type!(hash_state, context, x, tx, hoist_type::Bool)
+    hash_state = if hoist_type
+        hash_type!(hash_state, context, typeof(x))
+    else
+        hash_type!(hash_state, context, typeof(tx))
+    end
+    return hash_state
 end
 
 """
