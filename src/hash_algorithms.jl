@@ -132,7 +132,7 @@ function flush_bytes!(x::BufferedHashState, limit=x.limit - (x.limit >> 2))
         x.total_bytes_hashed += position(x.io) # tack total number of bytes that have been hashed
         x.content_hash_state = update_hash!(x.content_hash_state, take!(x.io))
         x.delimiter_hash_state = update_hash!(x.delimiter_hash_state,
-                                              copy(reinterpret(UInt8, x.delimiters)))
+                                              as_hash_compatible_input(x.delimiters, x.delimiter_hash_state))
 
         empty!(x.delimiters)
     end
@@ -159,7 +159,7 @@ function compute_hash!(x::BufferedHashState)
     flush_bytes!(x, 0)
     # recursively hash the delimiter hash state into the content hash
     delimiter_hash = compute_hash!(x.delimiter_hash_state)
-    state = update_hash!(x.content_hash_state, copy(reinterpret(UInt8, asarray(delimiter_hash))))
+    state = update_hash!(x.content_hash_state, as_hash_compatible_input(delimiter_hash, x.content_hash_state))
 
     return compute_hash!(state)
 end

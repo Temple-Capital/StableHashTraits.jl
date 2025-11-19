@@ -105,15 +105,22 @@ Hash type `T` in the given context, updating `hash_state`.
 """
 function hash_type!(hash_state, context, ::Type{T}) where {T}
     digest = type_digest(T, hash_state, context)
-    bytes = copy(reinterpret(UInt8, asarray(digest)))
+    bytes = as_hash_compatible_input(digest, hash_state)
 
     return update_hash!(hash_state, bytes)
 end
-if VERSION >= v"1.11"
-    asarray(x) = setindex!(Memory{typeof(x)}(undef, 1), x, 1)
-else
-    asarray(x) = [x]
-end
+
+"""
+    as_hash_compatible_input(digest, hash_state)
+
+Return a representation of `digest` suitable for passing to `update_hash!` with
+`hash_state`. By default, this is a `Vector{UInt8}`.
+"""
+as_hash_compatible_input(digest, hash_state) = as_bytes_vector(digest)
+as_bytes_vector(digest) = copy(reinterpret(UInt8, asarray(digest)))
+as_bytes_vector(x::Union{UInt32,UInt64,UInt128}) = collect(reinterpret(NTuple{sizeof(x),UInt8}, x))
+
+asarray(x) = [x]
 asarray(x::AbstractArray) = x
 
 struct TypeHashContext{T}
