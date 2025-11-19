@@ -425,6 +425,36 @@ end
     @test h == mapfoldr(x -> getfield(s, x), xxh3_64, sort(fieldnames(typeof(s)), rev=true); init=UInt(0))
 end
 
+@testset "cached hash" begin
+    StableHashTraits.@context MyContextCachedTest
+    function myhash(x, i=UInt(0))
+        xxh3_64(x, i)
+    end
+    mutable struct Node
+        args::Vector{Any}
+        hash::Union{Nothing,UInt64}
+        function Node(args::Vector{Any})
+            x = new(args, nothing)
+            x.hash = StableHashTraits.stable_hash!(x, StableHashTraits.RecursiveHashState(myhash, UInt(0)),
+                                                  MyContextCachedTest(HashVersion{4}()))
+            return x
+        end
+    end
+
+    StableHashTraits.hash_computed(x::Node) = !isnothing(x.hash)
+    StableHashTraits.HashLookup(::Type{Node}) = StableHashTraits.FetchHash()
+    StableHashTraits.fetch_hash(x::Node) = x.hash
+    function StableHashTraits.transformer(::Type{Node}, context::MyContextCachedTest)::StableHashTraits.Transformer
+        StableHashTraits.Transformer(omit_fields(:hash), hoist_type=true)
+    end
+    StableHashTraits.as_hash_compatible_input(x::UInt64, ::StableHashTraits.RecursiveHashState{typeof(myhash),UInt64}) = x
+    T = StableHashTraits.type_digest(Node, StableHashTraits.RecursiveHashState(myhash, UInt(0)), MyContextCachedTest(HashVersion{4}()))
+    n1 = Node(Any[])
+    @test n1.hash == myhash(0, myhash(T))
+    n = Node(Any[n1, n1])
+    @test n.hash == myhash(n1.hash, myhash(n1.hash, myhash(2, myhash(T))))
+end
+
 @testset "Aqua" begin
     # NOTE: aqua incorrectly flags the split_union method as having unbound type arguments
     Aqua.test_all(StableHashTraits; unbound_args=(; broken=true))

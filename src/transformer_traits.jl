@@ -7,6 +7,38 @@ hash_trait(::Transformer{<:Any,Nothing}, y) = hash_trait(y)
 hash_trait(x) = StructType(x)
 
 """
+    HashLookup
+
+Determine whether we should compute the hash of a value from scratch, or fetch a precomputed
+hash value for it. By default, we compute the hash from scratch. If a type provides its own
+hash value, it should specialize `HashLookup` to return `FetchHash` and implement `fetch_hash` to return the hash.
+"""
+abstract type HashLookup end
+struct ComputeHash <: HashLookup end
+struct FetchHash <: HashLookup end
+HashLookup(x::Any) = HashLookup(typeof(x))
+HashLookup(::Type) = ComputeHash()
+
+"""
+    fetch_hash(x)
+
+Return a precomputed hash value for `x`. This is only called when `HashLookup(x)` returns
+`FetchHash`. By default, this function is not implemented, and will throw an error if called.
+A type that specializes `HashLookup` to return `FetchHash` must provide its own implementation of this method.
+"""
+function fetch_hash end
+
+"""
+    hash_computed(x)
+
+Indicates whether a precomputed hash value is available for `x`. By default, this returns `false`.
+Types that specialize `HashLookup` to return `FetchHash` should also specialize this method to return `true` when the hash is available.
+
+This is mainly useful when the hash must be computed once before being fetched subsequently.
+"""
+hash_computed(x) = false
+
+"""
     TraversalStyle(context)
 
 Determine the traversal style to use when hashing objects in the given `context`.
@@ -28,7 +60,15 @@ TraversalStyle(::Type) = TopDownTraversal()
 TraversalStyle(::Type{<:BottomUpTraversalContext}) = BottomUpTraversal()
 
 # how we hash when we haven't hoisted the type hash out of a loop
-hash_type_and_value(x, hash_state, context) = hash_type_and_value(x, hash_state, context, TraversalStyle(context))
+hash_type_and_value(x, hash_state, context) = hash_type_and_value(x, hash_state, context, HashLookup(x))
+hash_type_and_value(x, hash_state, context, ::ComputeHash) = hash_type_and_value(x, hash_state, context, TraversalStyle(context))
+function hash_type_and_value(x, hash_state, context, ::FetchHash)
+    if hash_computed(x)
+        return update_hash!(hash_state, fetch_hash(x))
+    else
+        return hash_type_and_value(x, hash_state, context, TraversalStyle(context))
+    end
+end
 
 function hash_type_and_value(x, hash_state, context, ::TopDownTraversal)
     transform = transformer(typeof(x), context)::Transformer
@@ -48,7 +88,19 @@ end
 
 # how we hash when the type hash can be hoisted out of a loop
 function hash_value(x, hash_state, context, transform::Transformer; tx = transform(x))
+    return hash_value(HashLookup(x), x, hash_state, context, transform; tx = tx)
+end
+
+function hash_value(::ComputeHash, x, hash_state, context, transform::Transformer; tx = transform(x))
     return stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
+end
+
+function hash_value(::FetchHash, x, hash_state, context, transform::Transformer; tx = transform(x))
+    if hash_computed(x)
+        return update_hash!(hash_state, fetch_hash(x))
+    else
+        return hash_value(ComputeHash(), x, hash_state, context, transform; tx = tx)
+    end
 end
 
 # There are two cases where we want to hash types:
@@ -85,7 +137,8 @@ function type_digest(::Type{T}, hash_state, context) where {T}
     tT = transform(T)
     hash_type_state = similar_hash_state(hash_state)
     hash_type_state = hash_value(tT, hash_type_state, type_context, transform; tx = tT)
-    return compute_hash!(hash_type_state)
+    digest = compute_hash!(hash_type_state)
+    return digest
 end
 
 function hash_type!(hash_state, context, x, tx, hoist_type::Bool)
