@@ -43,20 +43,20 @@ function hash_type_and_value(x, hash_state, context, ::TopDownTraversal)
     transform = transformer(typeof(x), context)::Transformer
     tx = transform(x)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
-    return stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
+    hash_state = hash_value(x, hash_state, context, transform; tx = tx)
+    return hash_state
 end
 
 function hash_type_and_value(x, hash_state, context, ::BottomUpTraversal)
     transform = transformer(typeof(x), context)::Transformer
     tx = transform(x)
-    hash_state = stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
+    hash_state = hash_value(x, hash_state, context, transform; tx = tx)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
     return hash_state
 end
 
 # how we hash when the type hash can be hoisted out of a loop
-function hash_value(x, hash_state, context, transform::Transformer)
-    tx = transform(x)
+function hash_value(x, hash_state, context, transform::Transformer; tx = transform(x))
     return stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
 end
 
