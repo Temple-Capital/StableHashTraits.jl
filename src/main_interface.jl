@@ -159,7 +159,7 @@ struct PickFields{T} <: Function
     fields::T
 end
 hoist_type(::PickFields) = true
-function (p::PickFields)(x::T) where {T}
+Base.@constprop :aggressive function (p::PickFields)(x::T) where {T}
     vals = map(f -> getfield(x, f), p.fields)
     types = map(f -> fieldtype(T, f), p.fields)
     return NamedTuple{p.fields,Tuple{types...}}(vals)
@@ -184,7 +184,7 @@ struct OmitFields{T} <: Function
     fields::T
 end
 hoist_type(::OmitFields) = true
-function (o::OmitFields)(x::T) where {T}
+Base.@constprop :aggressive function (o::OmitFields)(x::T) where {T}
     fields = filter(f -> f ∉ o.fields, fieldnames(T))
     vals = map(f -> getfield(x, f), fields)
     types = map(f -> fieldtype(T, f), fields)
