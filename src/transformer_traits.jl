@@ -75,7 +75,20 @@ end
 ##### Type Hashes
 #####
 
-function _type_digest!(hash_state, context, ::Type{T}) where {T}
+"""
+    type_digest(T, context; alg = sha256)
+    type_digest(T, hash_state, context)
+
+Compute the hash digest of type `T` in the given context, and using a similar `hash_state`, if provided.
+
+```jldoctest
+julia> StableHashTraits.type_digest(Int64, HashVersion{4}()) |> bytes2hex
+"475e60698746bb2903a6d8637a17e6f88ae76d2c93a89eb18d295baf094e7837"
+```
+"""
+type_digest(::Type{T}, context; alg = sha256) where {T} = type_digest(T, HashState(alg, context), context)
+
+function type_digest(::Type{T}, hash_state, context) where {T}
     type_context = TypeHashContext(context)
     transform = transformer(typeof(T), type_context)
     tT = transform(T)
@@ -91,7 +104,7 @@ end
 Hash type `T` in the given context, updating `hash_state`.
 """
 function hash_type!(hash_state, context, ::Type{T}) where {T}
-    digest = _type_digest!(hash_state, context, T)
+    digest = type_digest(T, hash_state, context)
     bytes = copy(reinterpret(UInt8, asarray(digest)))
 
     return update_hash!(hash_state, bytes)
