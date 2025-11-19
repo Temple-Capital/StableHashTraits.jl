@@ -33,6 +33,7 @@ Tables = "1.7"
 Test = "1"
 TupleTools = "1"
 UUIDs = "1"
+XXhash = "0.8"
 julia = "1.10"
 
 [extras]
@@ -47,6 +48,7 @@ Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
 ReferenceTests = "324d217c-45ce-50fc-942e-d289b448e8cf"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 UUIDs = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+XXhash = "137af188-b1ec-11e9-0b40-31ed9142ae64"
 
 [targets]
-test = ["AWSS3", "Aqua", "BenchmarkTools", "Blake3Hash", "CRC32c", "DataFrames", "Dates", "Pluto", "ReferenceTests", "Test", "UUIDs"]
+test = ["AWSS3", "Aqua", "BenchmarkTools", "Blake3Hash", "CRC32c", "DataFrames", "Dates", "Pluto", "ReferenceTests", "Test", "UUIDs", "XXhash"]

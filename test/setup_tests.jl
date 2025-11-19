@@ -12,6 +12,7 @@ using Tables
 using AWSS3
 using Pluto
 using StructTypes
+using XXhash
 
 struct TestType
     a::Any

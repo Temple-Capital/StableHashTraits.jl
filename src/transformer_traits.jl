@@ -6,17 +6,52 @@ hash_trait(x::Transformer, y) = x.result_method
 hash_trait(::Transformer{<:Any,Nothing}, y) = hash_trait(y)
 hash_trait(x) = StructType(x)
 
+"""
+    TraversalStyle(context)
+
+Determine the traversal style to use when hashing objects in the given `context`.
+Defaults to `TopDownTraversal`, but can be specialized for specific contexts.
+In a `TopDownTraversal`, the type digest of an object is hashed before its value/fields;
+in a `BottomUpTraversal`, the type digest is hashed after its value/fields.
+
+Contexts that wrap another context should generally forward to the parent context unless they
+specifically want to change the traversal style.
+"""
+abstract type TraversalStyle end
+struct TopDownTraversal <: TraversalStyle end
+struct BottomUpTraversal <: TraversalStyle end
+
+TraversalStyle(x::Any) = TraversalStyle(typeof(x))
+TraversalStyle(::Type) = TopDownTraversal()
+
+@context BottomUpTraversalContext
+TraversalStyle(::Type{<:BottomUpTraversalContext}) = BottomUpTraversal()
+
 # how we hash when we haven't hoisted the type hash out of a loop
-function hash_type_and_value(x, hash_state, context)
+hash_type_and_value(x, hash_state, context) = hash_type_and_value(x, hash_state, context, TraversalStyle(context))
+
+function hash_type!(hash_state, context, x, tx, hoist_type::Bool)
+    hash_state = if hoist_type
+        hash_type!(hash_state, context, typeof(x))
+    else
+        hash_type!(hash_state, context, typeof(tx))
+    end
+    return hash_state
+end
+
+function hash_type_and_value(x, hash_state, context, ::TopDownTraversal)
     transform = transformer(typeof(x), context)::Transformer
-    if transform.hoist_type
-        hash_state = hash_type!(hash_state, context, typeof(x))
-    end
     tx = transform(x)
-    if !transform.hoist_type
-        hash_state = hash_type!(hash_state, context, typeof(tx))
-    end
+    hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
     return stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
+end
+
+function hash_type_and_value(x, hash_state, context, ::BottomUpTraversal)
+    transform = transformer(typeof(x), context)::Transformer
+    tx = transform(x)
+    hash_state = stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
+    hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
+    return hash_state
 end
 
 # how we hash when the type hash can be hoisted out of a loop
@@ -40,7 +75,7 @@ end
 ##### Type Hashes
 #####
 
-function _hash_type!(hash_state, context, ::Type{T}) where {T}
+function _type_digest!(hash_state, context, ::Type{T}) where {T}
     type_context = TypeHashContext(context)
     transform = transformer(typeof(T), type_context)
     tT = transform(T)
@@ -56,7 +91,7 @@ end
 Hash type `T` in the given context, updating `hash_state`.
 """
 function hash_type!(hash_state, context, ::Type{T}) where {T}
-    digest = _hash_type!(hash_state, context, T)
+    digest = _type_digest!(hash_state, context, T)
     bytes = copy(reinterpret(UInt8, asarray(digest)))
 
     return update_hash!(hash_state, bytes)

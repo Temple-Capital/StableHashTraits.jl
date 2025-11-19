@@ -410,7 +410,19 @@ end
     a = SimpleStruct(1,2.0,"c")
     state = StableHashTraits.BufferedHashState(Blake3Ctx())
     h = StableHashTraits.stable_hash!(a, state, HashVersion{4}()) |> bytes2hex
-    @test h == "2fd2220cf6cdc2ae4c73c8e2947b6c31b95c2dc77710d2ac1f5c74b138555ca7"
+    @test h == "d6c1cd25d222e6c7d41613a5490fe5fc18ab9b244d9eb22c409c561120b4ea10"
+end
+
+@testset "Bottom-up hashing" begin
+    StableHashTraits.@context MyContext
+    ctx = MyContext(StableHashTraits.BottomUpTraversalContext(HashVersion{4}()))
+    StableHashTraits.TraversalStyle(::Type{MyContext{T}}) where {T} = StableHashTraits.TraversalStyle(T)
+    # skip hashing the type for ease of comparison
+    StableHashTraits.hash_type!(hash_state, ::MyContext, ::Type{T}) where {T} = hash_state
+    s = SimpleStruct(1,2.0,"c")
+    state = StableHashTraits.RecursiveHashState(xxh3_64, UInt(0))
+    h = StableHashTraits.stable_hash!(s, state, ctx)
+    @test h == mapfoldr(x -> getfield(s, x), xxh3_64, sort(fieldnames(typeof(s)), rev=true); init=UInt(0))
 end
 
 @testset "Aqua" begin
