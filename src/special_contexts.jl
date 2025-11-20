@@ -40,3 +40,23 @@ function transformer(::Type{T}, c::TablesEq) where {T}
     Tables.istable(T) && return Transformer(columntable)
     return transformer(T, parent_context(c))
 end
+
+"""
+    TypeDigestCachedContext(parent::T, ::Type{D}) where {T, D}
+
+A hash context that caches type digests for types seen so far to avoid recomputing them.
+"""
+struct TypeDigestCachedContext{T, D}
+    parent::T
+    cache::IdDict{Any, D}
+end
+
+TypeDigestCachedContext(parent::T, ::Type{D}) where {T, D} = TypeDigestCachedContext{T, D}(parent, IdDict{Any, D}())
+
+parent_context(c::TypeDigestCachedContext) = c.parent
+
+function type_digest(::Type{T}, hash_state, context::TypeDigestCachedContext) where {T}
+    get!(context.cache, T) do
+        type_digest(T, hash_state, parent_context(context))
+    end
+end
