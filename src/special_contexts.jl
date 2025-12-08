@@ -60,3 +60,5 @@ function type_digest(::Type{T}, hash_state, context::TypeDigestCachedContext) wh
         type_digest(T, hash_state, parent_context(context))
     end
 end
+
+TraversalStyle(::Type{<:TypeDigestCachedContext{T}}) where {T} = TraversalStyle(T)
