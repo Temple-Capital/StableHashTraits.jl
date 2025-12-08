@@ -428,17 +428,16 @@ end
 @testset "cached hash" begin
     StableHashTraits.@context MyContextCachedTest
     function myhash(x, i=UInt(0))
-        y = xxh3_64(x, i)
-        # @show x, i, y
-        return y
+        return xxh3_64(x, i)
     end
+    StableHashTraits.HashState(alg, ::MyContextCachedTest) = StableHashTraits.RecursiveHashState(alg, UInt(0))
+    cached_context = MyContextCachedTest(HashVersion{4}())
     mutable struct Node
         args::Vector{Any}
         hash::Union{Nothing,UInt64}
         function Node(args::Vector{Any})
             x = new(args, nothing)
-            x.hash = StableHashTraits.stable_hash!(x, StableHashTraits.RecursiveHashState(myhash, UInt(0)),
-                                                  MyContextCachedTest(HashVersion{4}()))
+            x.hash = StableHashTraits.stable_hash(x, cached_context; alg=myhash)
             return x
         end
     end
@@ -450,13 +449,23 @@ end
         StableHashTraits.Transformer(omit_fields(:hash), hoist_type=true)
     end
     StableHashTraits.as_hash_compatible_input(x::UInt64, ::StableHashTraits.RecursiveHashState{typeof(myhash),UInt64}) = x
-    T = StableHashTraits.type_digest(Node, StableHashTraits.RecursiveHashState(myhash, UInt(0)), MyContextCachedTest(HashVersion{4}()))
+    Node_type_digest = StableHashTraits.type_digest(Node, MyContextCachedTest(HashVersion{4}()); alg=myhash)
     n1 = Node(Any[])
-    @test n1.hash == myhash(0, myhash(T)) # 0 for empty args, and T contains the type digest. We rehash the digest to mix in the type.
+    @test n1.hash == myhash(0, myhash(Node_type_digest)) # 0 for empty args, and T contains the type digest. We rehash the digest to mix in the type.
     n2 = Node(Any[n1, n1])
-    @test n2.hash == myhash(n1.hash, myhash(n1.hash, myhash(2, myhash(T))))
+    @test n2.hash == myhash(n1.hash, myhash(n1.hash, myhash(2, myhash(Node_type_digest))))
     n3 = Node(Any[n2, n2, n1])
-    @test n3.hash == myhash(n1.hash, myhash(n2.hash, myhash(n2.hash, myhash(3, myhash(T)))))
+    @test n3.hash == myhash(n1.hash, myhash(n2.hash, myhash(n2.hash, myhash(3, myhash(Node_type_digest)))))
+
+    struct Nodes
+        nodes::Vector{Node}
+    end
+    # In this case, even though the eltype is hoisted, we still use the hash for each element as if there's no hoisting.
+    # This is because the cached hashes contain both the type and the value, and we don't want to separate them out.
+    ns = Nodes([n1, n2, n3])
+    ns_hash = StableHashTraits.stable_hash(ns, cached_context; alg=myhash)
+    Nodes_type_digest = StableHashTraits.type_digest(Nodes, cached_context; alg=myhash)
+    @test ns_hash == myhash(n3.hash, myhash(n2.hash, myhash(n1.hash, myhash(3, myhash(Nodes_type_digest)))))
 end
 
 @testset "Aqua" begin
