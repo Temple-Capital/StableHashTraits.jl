@@ -81,23 +81,32 @@ end
 macro hash_retrieval(T, field_with_default::Expr, context_type=HashVersion{4}, hoist_type::Union{Nothing,Bool}=nothing)
     field_with_default.head == :(=) || error("@hash_field requires a field with a default value provided as `field = default`")
     field, default = field_with_default.args
+    default = esc(default)
+    T = esc(T)
+    field_quote = Expr(:quote, field)
     q = quote
-        StableHashTraits.HashRetrievalStrategy(::Type{$(esc(T))}) = FetchHash()
-        StableHashTraits.hash_computed(x::$(esc(T))) = x.$(field) != $(esc(default))
-        StableHashTraits.fetch_hash(x::$(esc(T))) = x.$(field)
+        FT = fieldtype($T, $field_quote)
+        $(default) isa FT || throw(ArgumentError("Provided default value is not of the correct type, expected $FT"))
+        StableHashTraits.HashRetrievalStrategy(::Type{$T}) = FetchHash()
+        StableHashTraits.hash_computed(x::$T) = x.$(field) != $default
+        if isnothing($default)
+            StableHashTraits.fetch_hash(x::$T) = something(x.$(field))
+        else
+            StableHashTraits.fetch_hash(x::$T) = x.$(field)
+        end
     end
     q = if isnothing(hoist_type)
         quote
             $q
-            function StableHashTraits.transformer(::Type{$(esc(T))}, ::$(esc(context_type)))
-                Transformer(omit_fields($(Expr(:quote, field))))
+            function StableHashTraits.transformer(::Type{$T}, ::$(esc(context_type)))
+                Transformer(omit_fields($field_quote))
             end
         end
     else
         quote
             $q
-            function StableHashTraits.transformer(::Type{$(esc(T))}, ::$(esc(context_type)))
-                Transformer(omit_fields($(Expr(:quote, field))), hoist_type=$(esc(hoist_type)))
+            function StableHashTraits.transformer(::Type{$T}, ::$(esc(context_type)))
+                Transformer(omit_fields($field_quote), hoist_type=$(esc(hoist_type)))
             end
         end
     end
