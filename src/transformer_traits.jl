@@ -7,24 +7,25 @@ hash_trait(::Transformer{<:Any,Nothing}, y) = hash_trait(y)
 hash_trait(x) = StructType(x)
 
 """
-    HashLookup
+    HashRetrievalStrategy
 
 Determine whether we should compute the hash of a value from scratch, or fetch a precomputed
 hash value for it. By default, we compute the hash from scratch. If a type provides its own
-hash value, it should specialize `HashLookup` to return `FetchHash` and implement `fetch_hash` to return the hash.
+hash value, it should specialize `HashRetrievalStrategy` to return `FetchHash` and implement `fetch_hash` to return the hash.
+In this case, the object identity and its hash would be considered interchangeable for hashing purposes.
 """
-abstract type HashLookup end
-struct ComputeHash <: HashLookup end
-struct FetchHash <: HashLookup end
-HashLookup(x::Any) = HashLookup(typeof(x))
-HashLookup(::Type) = ComputeHash()
+abstract type HashRetrievalStrategy end
+struct ComputeHash <: HashRetrievalStrategy end
+struct FetchHash <: HashRetrievalStrategy end
+HashRetrievalStrategy(x::Any) = HashRetrievalStrategy(typeof(x))
+HashRetrievalStrategy(::Type) = ComputeHash()
 
 """
     fetch_hash(x)
 
-Return a precomputed hash value for `x`. This is only called when `HashLookup(x)` returns
+Return a precomputed hash value for `x`. This is only called when `HashRetrievalStrategy(x)` returns
 `FetchHash`. By default, this function is not implemented, and will throw an error if called.
-A type that specializes `HashLookup` to return `FetchHash` must provide its own implementation of this method.
+A type that specializes `HashRetrievalStrategy` to return `FetchHash` must provide its own implementation of this method.
 """
 function fetch_hash end
 
@@ -32,9 +33,24 @@ function fetch_hash end
     hash_computed(x)
 
 Indicates whether a precomputed hash value is available for `x`. By default, this returns `false`.
-Types that specialize `HashLookup` to return `FetchHash` should also specialize this method to return `true` when the hash is available.
+Types that specialize `HashRetrievalStrategy` to return `FetchHash` should also specialize this method to return `true` when the hash is available.
 
 This is mainly useful when the hash must be computed once before being fetched subsequently.
+
+An example of usage:
+```julia
+mutable struct FieldWithHash
+    field
+    hash::Union{Nothing, UInt64}
+    function FieldWithHash(field)
+        x = new(field, nothing)
+        x.hash = stable_hash(x, HashVersion{4}())
+        return x
+    end
+end
+StableHashTraits.hash_computed(x::FieldWithHash) = !isnothing(x.hash)
+StableHashTraits.fetch_hash(x::FieldWithHash) = x.hash
+```
 """
 hash_computed(x) = false
 
@@ -60,26 +76,32 @@ TraversalStyle(::Type) = TopDownTraversal()
 TraversalStyle(::Type{<:BottomUpTraversalContext}) = BottomUpTraversal()
 
 # how we hash when we haven't hoisted the type hash out of a loop
-hash_type_and_value(x, hash_state, context) = hash_type_and_value(x, hash_state, context, HashLookup(x))
-hash_type_and_value(x, hash_state, context, ::ComputeHash) = hash_type_and_value(x, hash_state, context, TraversalStyle(context))
-function hash_type_and_value(x, hash_state, context, ::FetchHash)
+function hash_type_and_value(x, hash_state, context)
+    hash_type_and_value(HashRetrievalStrategy(x), x, hash_state, context)
+end
+
+function hash_type_and_value(::FetchHash, x, hash_state, context)
     if hash_computed(x)
         return update_hash!(hash_state, fetch_hash(x))
     else
-        return hash_type_and_value(x, hash_state, context, TraversalStyle(context))
+        return hash_type_and_value(ComputeHash(), x, hash_state, context)
     end
 end
 
-function hash_type_and_value(x, hash_state, context, ::TopDownTraversal)
+function hash_type_and_value(::ComputeHash, x, hash_state, context)
     transform = transformer(typeof(x), context)::Transformer
+    hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform)
+    return hash_state
+end
+
+function hash_type_and_value(::TopDownTraversal, x, hash_state, context, transform::Transformer)
     tx = transform(x)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
     hash_state = hash_value(x, hash_state, context, transform; tx = tx)
     return hash_state
 end
 
-function hash_type_and_value(x, hash_state, context, ::BottomUpTraversal)
-    transform = transformer(typeof(x), context)::Transformer
+function hash_type_and_value(::BottomUpTraversal, x, hash_state, context, transform::Transformer)
     tx = transform(x)
     hash_state = hash_value(x, hash_state, context, transform; tx = tx)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
@@ -88,19 +110,7 @@ end
 
 # how we hash when the type hash can be hoisted out of a loop
 function hash_value(x, hash_state, context, transform::Transformer; tx = transform(x))
-    return hash_value(HashLookup(x), x, hash_state, context, transform; tx = tx)
-end
-
-function hash_value(::ComputeHash, x, hash_state, context, transform::Transformer; tx = transform(x))
     return stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
-end
-
-function hash_value(::FetchHash, x, hash_state, context, transform::Transformer; tx = transform(x))
-    if hash_computed(x)
-        return update_hash!(hash_state, fetch_hash(x))
-    else
-        return hash_value(ComputeHash(), x, hash_state, context, transform; tx = tx)
-    end
 end
 
 # There are two cases where we want to hash types:
@@ -298,7 +308,8 @@ Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
     map(fields, vals) do field, val
         # can we optimize away the field's type_hash?
         transform = transformer(typeof(val), context)
-        if isconcretetype(fieldtype(typeof(x), field)) && transform.hoist_type
+        FT = fieldtype(typeof(x), field)
+        if isconcretetype(FT) && transform.hoist_type && HashRetrievalStrategy(FT) !== FetchHash()
             # the fieldtype has been hashed as part of the type of the container
             hash_value(val, hash_state, context, transform)
         else
@@ -397,7 +408,9 @@ end
 
 function hash_elements(items, hash_state, context, transform)
     # can we optimize away the element type hash?
-    if isconcretetype(eltype(items)) && transform.hoist_type
+    # We skip this if the elements store their own hash, as the type of each elements has already been hashed
+    type_hoist = isconcretetype(eltype(items)) && transform.hoist_type && HashRetrievalStrategy(eltype(items)) !== FetchHash()
+    if type_hoist
         # the eltype has already been hashed as part of the type structure of
         # the container
         for x in items

@@ -428,7 +428,9 @@ end
 @testset "cached hash" begin
     StableHashTraits.@context MyContextCachedTest
     function myhash(x, i=UInt(0))
-        xxh3_64(x, i)
+        y = xxh3_64(x, i)
+        # @show x, i, y
+        return y
     end
     mutable struct Node
         args::Vector{Any}
@@ -442,7 +444,7 @@ end
     end
 
     StableHashTraits.hash_computed(x::Node) = !isnothing(x.hash)
-    StableHashTraits.HashLookup(::Type{Node}) = StableHashTraits.FetchHash()
+    StableHashTraits.HashRetrievalStrategy(::Type{Node}) = StableHashTraits.FetchHash()
     StableHashTraits.fetch_hash(x::Node) = x.hash
     function StableHashTraits.transformer(::Type{Node}, context::MyContextCachedTest)::StableHashTraits.Transformer
         StableHashTraits.Transformer(omit_fields(:hash), hoist_type=true)
@@ -450,9 +452,11 @@ end
     StableHashTraits.as_hash_compatible_input(x::UInt64, ::StableHashTraits.RecursiveHashState{typeof(myhash),UInt64}) = x
     T = StableHashTraits.type_digest(Node, StableHashTraits.RecursiveHashState(myhash, UInt(0)), MyContextCachedTest(HashVersion{4}()))
     n1 = Node(Any[])
-    @test n1.hash == myhash(0, myhash(T))
-    n = Node(Any[n1, n1])
-    @test n.hash == myhash(n1.hash, myhash(n1.hash, myhash(2, myhash(T))))
+    @test n1.hash == myhash(0, myhash(T)) # 0 for empty args, and T contains the type digest. We rehash the digest to mix in the type.
+    n2 = Node(Any[n1, n1])
+    @test n2.hash == myhash(n1.hash, myhash(n1.hash, myhash(2, myhash(T))))
+    n3 = Node(Any[n2, n2, n1])
+    @test n3.hash == myhash(n1.hash, myhash(n2.hash, myhash(n2.hash, myhash(3, myhash(T)))))
 end
 
 @testset "Aqua" begin
