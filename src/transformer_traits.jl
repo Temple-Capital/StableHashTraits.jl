@@ -110,12 +110,15 @@ function hash_type!(hash_state, context, ::Type{T}) where {T}
 end
 
 """
-    as_hash_compatible_input(digest, hash_state)
+    as_hash_compatible_input(digest, context; alg = sha256)
+    as_hash_compatible_input(digest, hash_state::HashState)
 
 Return a representation of `digest` suitable for passing to `update_hash!` with
-`hash_state`. By default, this is a `Vector{UInt8}`.
+`hash_state`. By default, this is a `Vector{UInt8}`. If a context and an algorithm
+are provided, a `HashState` is constructed to determine the appropriate representation.
 """
-as_hash_compatible_input(digest, hash_state) = as_bytes_vector(digest)
+as_hash_compatible_input(digest, context; alg = sha256) = as_hash_compatible_input(digest, HashState(alg, context))
+as_hash_compatible_input(digest, hash_state::HashState) = as_bytes_vector(digest)
 as_bytes_vector(digest) = copy(reinterpret(UInt8, asarray(digest)))
 as_bytes_vector(x::Union{UInt32,UInt64,UInt128}) = collect(reinterpret(NTuple{sizeof(x),UInt8}, x))
 
