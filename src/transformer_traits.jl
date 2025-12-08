@@ -55,6 +55,56 @@ StableHashTraits.fetch_hash(x::FieldWithHash) = x.hash
 hash_computed(x) = false
 
 """
+    @hash_retrieval T field = default [context_type] [hoist_type]
+
+Define methods for types that store a precomputed hash value in a specific field. The macro defines the necessary
+specializations of `HashRetrievalStrategy`, `hash_computed`, and `fetch_hash` for type `T`, using the specified
+`field` to store the hash value, which defaults to `default` if not computed.
+
+The `context_type` is optional, and is used to specialize the `transformer` method to omit the specified field from hashing.
+If `hoist_type` is provided, this is passed on to the `Transformer` constructor to indicate whether the type hash can be hoisted out of loops.
+
+Example:
+```julia
+mutable struct FieldWithHash
+    field
+    hash::Union{Nothing, UInt64}
+    function FieldWithHash(field)
+        x = new(field, nothing)
+        x.hash = stable_hash(x, HashVersion{4}())
+        return x
+    end
+end
+@hash_retrieval FieldWithHash hash=nothing
+```
+"""
+macro hash_retrieval(T, field_with_default::Expr, context_type=HashVersion{4}, hoist_type::Union{Nothing,Bool}=nothing)
+    field_with_default.head == :(=) || error("@hash_field requires a field with a default value provided as `field = default`")
+    field, default = field_with_default.args
+    q = quote
+        StableHashTraits.HashRetrievalStrategy(::Type{$(esc(T))}) = FetchHash()
+        StableHashTraits.hash_computed(x::$(esc(T))) = x.$(field) != $(esc(default))
+        StableHashTraits.fetch_hash(x::$(esc(T))) = x.$(field)
+    end
+    q = if isnothing(hoist_type)
+        quote
+            $q
+            function StableHashTraits.transformer(::Type{$(esc(T))}, ::$(esc(context_type)))
+                Transformer(omit_fields($(Expr(:quote, field))))
+            end
+        end
+    else
+        quote
+            $q
+            function StableHashTraits.transformer(::Type{$(esc(T))}, ::$(esc(context_type)))
+                Transformer(omit_fields($(Expr(:quote, field))), hoist_type=$(esc(hoist_type)))
+            end
+        end
+    end
+    return q
+end
+
+"""
     TraversalStyle(context)
 
 Determine the traversal style to use when hashing objects in the given `context`.

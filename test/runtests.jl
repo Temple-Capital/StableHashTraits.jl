@@ -442,12 +442,8 @@ end
         end
     end
 
-    StableHashTraits.hash_computed(x::Node) = !isnothing(x.hash)
-    StableHashTraits.HashRetrievalStrategy(::Type{Node}) = StableHashTraits.FetchHash()
-    StableHashTraits.fetch_hash(x::Node) = x.hash
-    function StableHashTraits.transformer(::Type{Node}, context::MyContextCachedTest)::StableHashTraits.Transformer
-        StableHashTraits.Transformer(omit_fields(:hash), hoist_type=true)
-    end
+    StableHashTraits.@hash_retrieval Node hash = nothing MyContextCachedTest
+
     StableHashTraits.as_hash_compatible_input(x::UInt64, ::StableHashTraits.RecursiveHashState{typeof(myhash),UInt64}) = x
     Node_type_digest = StableHashTraits.type_digest(Node, MyContextCachedTest(HashVersion{4}()); alg=myhash)
     n1 = Node(Any[])
