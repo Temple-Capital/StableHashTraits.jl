@@ -249,7 +249,9 @@ asarray(x::AbstractArray) = x
 
 struct TypeHashContext{T}
     parent::T
+    stack::Set{Any}
 end
+TypeHashContext(parent::T) where {T} = TypeHashContext{T}(parent, Set{DataType}())
 TypeHashContext(x::TypeHashContext) = x
 parent_context(x::TypeHashContext) = x.parent
 hash_type!(hash_state, ::TypeHashContext, key::Type) = hash_state
@@ -262,8 +264,18 @@ hash_type!(hash_state, ::TypeHashContext, key::Type) = hash_state
 pair_structure(x, ::Nothing) = x
 pair_structure(x, y) = (x, y)
 function transformer(::Type{T}, context::TypeHashContext) where {T<:Type}
-    return Transformer(T -> pair_structure(transform_type(T, parent_context(context)),
-                                           internal_type_structure_(T, StructType_(T))))
+    return Transformer() do T
+        transT = transform_type(T, parent_context(context))
+        sT = StructType_(T)
+        # avoid infinite recursion on recursive structs by skipping the internal structure
+        if sT isa StructTypes.Struct
+            if T in context.stack
+                return pair_structure(transT, nothing)
+            end
+            push!(context.stack, T)
+        end
+        pair_structure(transT, internal_type_structure_(T, sT))
+    end
 end
 @inline StructType_(T) = StructType(T)
 StructType_(::Type{Union{}}) = StructTypes.NoStructType()
