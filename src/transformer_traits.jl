@@ -481,12 +481,12 @@ function stable_hash_helper(xs, hash_state, context, ::StructTypes.ArrayType)
 end
 
 abstract type HashElementsStrategy end
-struct HashAll <: HashElementsStrategy end
-struct HashSelected <: HashElementsStrategy end
+struct HashAllElements <: HashElementsStrategy end
+struct HashSelectedElements <: HashElementsStrategy end
 HashElementsStrategy(context) = HashElementsStrategy(typeof(context))
-HashElementsStrategy(::Type) = HashAll()
+HashElementsStrategy(::Type) = HashAllElements()
 
-function _hash_elements(items, hash_state, context, transform, ::HashAll)
+function _hash_elements(items, hash_state, context, transform, ::HashAllElements)
     # can we optimize away the element type hash?
     # We skip this if the elements store their own hash, as the type of each elements has already been hashed
     type_hoist = isconcretetype(eltype(items)) && transform.hoist_type && HashRetrievalStrategy(eltype(items)) !== FetchHash()
@@ -581,7 +581,9 @@ function _hash_fib(f, A, hash_state, context, transform)
         # Hash the element
         elt = A[keyidx]
 
-        hash_state = f(elt, hash_state, context, transform)
+        # convert to a key-value pair if the transform is compatible, otherwise hash the element and hope for the best
+        eltp = transform isa Transformer{typeof(identity),Nothing} ? (keyidx=>elt) : elt
+        hash_state = f(eltp, hash_state, context, transform)
 
         # Skip backwards a Fibonacci number of indices -- this is a linear index operation
         linidx = key_to_linear[keyidx]
@@ -607,7 +609,7 @@ function _hash_fib(f, A, hash_state, context, transform)
     return hash_state
 end
 
-function _hash_elements(items, hash_state, context, transform, ::HashSelected)
+function _hash_elements(items, hash_state, context, transform, ::HashSelectedElements)
     # can we optimize away the element type hash?
     # We skip this if the elements store their own hash, as the type of each elements has already been hashed
     type_hoist = isconcretetype(eltype(items)) && transform.hoist_type && HashRetrievalStrategy(eltype(items)) !== FetchHash()
