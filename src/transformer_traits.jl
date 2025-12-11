@@ -480,7 +480,13 @@ function stable_hash_helper(xs, hash_state, context, ::StructTypes.ArrayType)
     end
 end
 
-function hash_elements(items, hash_state, context, transform)
+abstract type HashElementsStrategy end
+struct HashAllElements <: HashElementsStrategy end
+struct HashSelectedElements <: HashElementsStrategy end
+HashElementsStrategy(context) = HashElementsStrategy(typeof(context))
+HashElementsStrategy(::Type) = HashAllElements()
+
+function _hash_elements(items, hash_state, context, transform, ::HashAllElements)
     # can we optimize away the element type hash?
     # We skip this if the elements store their own hash, as the type of each elements has already been hashed
     type_hoist = isconcretetype(eltype(items)) && transform.hoist_type && HashRetrievalStrategy(eltype(items)) !== FetchHash()
@@ -496,6 +502,129 @@ function hash_elements(items, hash_state, context, transform)
         end
     end
     return hash_state
+end
+
+# The following are adapted from Julia Base
+#=
+Copyright (c) 2009 Jeff Bezanson
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+    * Neither the author nor the names of any contributors may be used to
+      endorse or promote products derived from this software without specific
+      prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+=#
+
+function hash_shaped(f, A, hash_state, context, transform)
+    len = length(A)
+
+    if len < 32768
+        for elt in A
+            hash_state = f(elt, hash_state, context, transform)
+        end
+    else
+        hash_state = _hash_fib(f, A, hash_state, context, transform)
+    end
+    return hash_state
+end
+
+function _hash_fib(f, A, hash_state, context, transform)
+    # Goal: Hash approximately log(N) entries with a higher density of hashed elements
+    # weighted towards the end and special consideration for repeated values. Colliding
+    # hashes will often subsequently be compared by equality -- and equality between arrays
+    # works elementwise forwards and is short-circuiting. This means that a collision
+    # between arrays that differ by elements at the beginning is cheaper than one where the
+    # difference is towards the end. Furthermore, choosing `log(N)` arbitrary entries from a
+    # sparse array will likely only choose the same element repeatedly (zero in this case).
+
+    # To achieve this, we work backwards, starting by hashing the last element of the
+    # array. After hashing each element, we skip `fibskip` elements, where `fibskip`
+    # is pulled from the Fibonacci sequence -- Fibonacci was chosen as a simple
+    # ~O(log(N)) algorithm that ensures we don't hit a common divisor of a dimension
+    # and only end up hashing one slice of the array (as might happen with powers of
+    # two). Finally, we find the next distinct value from the one we just hashed.
+
+    # This is a little tricky since skipping an integer number of values inherently works
+    # with linear indices, but `findprev` uses `keys`. Hoist out the conversion "maps":
+    ks = keys(A)
+    key_to_linear = LinearIndices(ks) # Index into this map to compute the linear index
+    linear_to_key = vec(ks)           # And vice-versa
+
+    # Start at the last index
+    keyidx = last(ks)
+    linidx = key_to_linear[keyidx]
+    fibskip = prevfibskip = oneunit(linidx)
+    first_linear = first(LinearIndices(linear_to_key))
+
+    n = 0
+    while true
+        n += 1
+        # Hash the element
+        elt = A[keyidx]
+
+        # convert to a key-value pair if the transform is compatible, otherwise hash the element and hope for the best
+        eltp = transform isa Transformer{typeof(identity),Nothing} ? (keyidx=>elt) : elt
+        hash_state = f(eltp, hash_state, context, transform)
+
+        # Skip backwards a Fibonacci number of indices -- this is a linear index operation
+        linidx = key_to_linear[keyidx]
+        linidx < fibskip + first_linear && break
+        linidx -= fibskip
+        keyidx = linear_to_key[linidx]
+
+        # Only increase the Fibonacci skip once every N iterations. This was chosen
+        # to be big enough that all elements of small arrays get hashed while
+        # obscenely large arrays are still tractable. With a choice of N=4096, an
+        # entirely-distinct 8000-element array will have ~75% of its elements hashed,
+        # with every other element hashed in the first half of the array. At the same
+        # time, hashing a `typemax(Int64)`-length Float64 range takes about a second.
+        if rem(n, 4096) == 0
+            fibskip, prevfibskip = fibskip + prevfibskip, fibskip
+        end
+
+        # Find a key index with a value distinct from `elt` -- might be `keyidx` itself
+        keyidx = findprev(!isequal(elt), A, keyidx)
+        keyidx === nothing && break
+    end
+
+    return hash_state
+end
+
+function _hash_elements(items, hash_state, context, transform, ::HashSelectedElements)
+    # can we optimize away the element type hash?
+    # We skip this if the elements store their own hash, as the type of each elements has already been hashed
+    type_hoist = isconcretetype(eltype(items)) && transform.hoist_type && HashRetrievalStrategy(eltype(items)) !== FetchHash()
+    if type_hoist
+        # the eltype has already been hashed as part of the type structure of
+        # the container
+        hash_shaped(hash_value, items, hash_state, context, transform)
+    else
+        hash_shaped((x, hash_state, context, transform) -> hash_type_and_value(x, hash_state, context), items, hash_state, context, transform)
+    end
+    return hash_state
+end
+
+function hash_elements(items, hash_state, context, transform)
+    _hash_elements(items, hash_state, context, transform, HashElementsStrategy(context))
 end
 
 #####

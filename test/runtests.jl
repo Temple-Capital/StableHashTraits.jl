@@ -464,6 +464,17 @@ end
     @test ns_hash == myhash(n3.hash, myhash(n2.hash, myhash(n1.hash, myhash(3, myhash(Nodes_type_digest)))))
 end
 
+@testset "Fibonacci element hashing for arrays" begin
+    StableHashTraits.@context MyContextFib
+    ctx = MyContextFib(HashVersion{4}())
+    StableHashTraits.HashElementsStrategy(::Type{<:MyContextFib}) = StableHashTraits.HashSelectedElements()
+    # for small arrays, we explicitly hash all elements
+    @test stable_hash([1,2], ctx, alg=hash) == stable_hash([1,2], HashVersion{4}(), alg=hash)
+    # The Fibonacci step increases from 1 to 2 after 4096, so check that there is a hash collision there
+    @test stable_hash(collect(1:2^16), ctx, alg=hash) == stable_hash(setindex!(collect(1:2^16), 0, 2^16-(4096+1)), ctx, alg=hash)
+    @test stable_hash(Vector{Any}(collect(1:2^16)), ctx, alg=hash) == stable_hash(setindex!(Vector{Any}(collect(1:2^16)), 0, 2^16-(4096+1)), ctx, alg=hash)
+end
+
 @testset "Aqua" begin
     # NOTE: aqua incorrectly flags the split_union method as having unbound type arguments
     Aqua.test_all(StableHashTraits; unbound_args=(; broken=true))
