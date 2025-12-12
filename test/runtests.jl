@@ -432,13 +432,13 @@ end
     end
     StableHashTraits.HashState(alg, ::MyContextCachedTest) = StableHashTraits.RecursiveHashState(alg, UInt(0))
     cached_context = MyContextCachedTest(HashVersion{4}())
-    mutable struct Node
+    struct Node
         args::Vector{Any}
         hash::Union{Nothing,UInt64}
         function Node(args::Vector{Any})
             x = new(args, nothing)
-            x.hash = StableHashTraits.stable_hash(x, cached_context; alg=myhash)
-            return x
+            hash = StableHashTraits.stable_hash(x, cached_context; alg=myhash)
+            return new(args, hash)
         end
     end
 

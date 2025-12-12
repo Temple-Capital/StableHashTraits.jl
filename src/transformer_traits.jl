@@ -149,19 +149,18 @@ end
 
 function hash_type_and_value(::ComputeHash, x, hash_state, context)
     transform = transformer(typeof(x), context)::Transformer
-    hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform)
+    tx = transform(x)
+    hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform; tx)
     return hash_state
 end
 
-function hash_type_and_value(::TopDownTraversal, x, hash_state, context, transform::Transformer)
-    tx = transform(x)
+function hash_type_and_value(::TopDownTraversal, x, hash_state, context, transform::Transformer; tx = transform(x))
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
     hash_state = hash_value(x, hash_state, context, transform; tx = tx)
     return hash_state
 end
 
-function hash_type_and_value(::BottomUpTraversal, x, hash_state, context, transform::Transformer)
-    tx = transform(x)
+function hash_type_and_value(::BottomUpTraversal, x, hash_state, context, transform::Transformer; tx = transform(x))
     hash_state = hash_value(x, hash_state, context, transform; tx = tx)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
     return hash_state
