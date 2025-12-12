@@ -617,7 +617,8 @@ function _hash_elements(items, hash_state, context, transform, ::HashSelectedEle
         # the container
         hash_shaped(hash_value, items, hash_state, context, transform)
     else
-        hash_shaped((x, hash_state, context, transform) -> hash_type_and_value(x, hash_state, context), items, hash_state, context, transform)
+        @inline hash_type_and_value_helper(x, hash_state, context, transform) = hash_type_and_value(x, hash_state, context)
+        hash_shaped(hash_type_and_value_helper, items, hash_state, context, transform)
     end
     return hash_state
 end
