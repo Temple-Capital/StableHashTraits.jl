@@ -16,6 +16,8 @@ struct HashVersion{V}
     end
 end
 
+Base.copy(h::HashVersion{V}) where {V} = h
+
 """
     stable_hash(x, context; alg=sha256)
     stable_hash(x; alg=sha256, version)
@@ -249,6 +251,7 @@ struct MyContext{T}
     parent::T
 end
 StableHashTraits.parent_context(x::MyContext) = x.parent
+Base.copy(x::MyContext) = MyContext(copy(x.parent))
 ```
 
 The parent context is typically another custom context, or the root context
@@ -272,6 +275,7 @@ macro context(TypeName)
             parent::T
         end
         StableHashTraits.parent_context(x::$(esc(TypeName))) = x.parent
+        Base.copy(x::$(esc(TypeName))) = $(esc(TypeName))(copy(x.parent))
     end
 end
 

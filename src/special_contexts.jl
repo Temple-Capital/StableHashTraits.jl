@@ -63,7 +63,7 @@ end
 
 TraversalStyle(::Type{<:TypeDigestCachedContext{T}}) where {T} = TraversalStyle(T)
 
-Base.copy(S::TypeDigestCachedContext) = TypeDigestCachedContext(S.parent, copy(S.cache))
+Base.copy(S::TypeDigestCachedContext) = TypeDigestCachedContext(copy(S.parent), copy(S.cache))
 
 function merge_context!(S::TypeDigestCachedContext, other::TypeDigestCachedContext)
     merge!(S.cache, other.cache)
@@ -94,7 +94,7 @@ end
 
 TraversalStyle(::Type{<:SymbolStringCachedContext{T}}) where {T} = TraversalStyle(T)
 
-Base.copy(S::SymbolStringCachedContext) = SymbolStringCachedContext(S.parent, copy(S.cache))
+Base.copy(S::SymbolStringCachedContext) = SymbolStringCachedContext(copy(S.parent), copy(S.cache))
 
 function merge_context!(S::SymbolStringCachedContext, other::SymbolStringCachedContext)
     merge!(S.cache, other.cache)
