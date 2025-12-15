@@ -62,3 +62,41 @@ function type_digest(::Type{T}, hash_state, context::TypeDigestCachedContext) wh
 end
 
 TraversalStyle(::Type{<:TypeDigestCachedContext{T}}) where {T} = TraversalStyle(T)
+
+Base.copy(S::TypeDigestCachedContext) = TypeDigestCachedContext(S.parent, copy(S.cache))
+
+function merge_context!(S::TypeDigestCachedContext, other::TypeDigestCachedContext)
+    merge!(S.cache, other.cache)
+    return S
+end
+
+"""
+    SymbolStringCachedContext(parent::T) where {T}
+
+A hash context that caches strings for symbols seen so far to avoid recomputing them.
+"""
+struct SymbolStringCachedContext{T}
+    parent::T
+    cache::Dict{Symbol, String}
+end
+
+SymbolStringCachedContext(parent::T) where {T} = SymbolStringCachedContext{T}(parent, Dict{Symbol, String}())
+
+parent_context(c::SymbolStringCachedContext) = c.parent
+
+function transformer(::Type{Symbol}, context::SymbolStringCachedContext)::Transformer
+    return Transformer(hoist_type = true) do x
+        return get!(context.cache, x) do
+            string(x)
+        end
+    end
+end
+
+TraversalStyle(::Type{<:SymbolStringCachedContext{T}}) where {T} = TraversalStyle(T)
+
+Base.copy(S::SymbolStringCachedContext) = SymbolStringCachedContext(S.parent, copy(S.cache))
+
+function merge_context!(S::SymbolStringCachedContext, other::SymbolStringCachedContext)
+    merge!(S.cache, other.cache)
+    return S
+end
