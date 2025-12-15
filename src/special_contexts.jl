@@ -42,6 +42,13 @@ function transformer(::Type{T}, c::TablesEq) where {T}
 end
 
 """
+    merge_context!(A, B)
+
+Merge the contents of hash context `B` into hash context `A`. This is useful if the contexts store mutable states that need to be updated.
+"""
+merge_context!(A, B) = A
+
+"""
     TypeDigestCachedContext(parent::T, ::Type{D}) where {T, D}
 
 A hash context that caches type digests for types seen so far to avoid recomputing them.
@@ -67,6 +74,7 @@ Base.copy(S::TypeDigestCachedContext) = TypeDigestCachedContext(copy(S.parent), 
 
 function merge_context!(S::TypeDigestCachedContext, other::TypeDigestCachedContext)
     merge!(S.cache, other.cache)
+    merge_context!(S.parent, other.parent)
     return S
 end
 
@@ -98,5 +106,6 @@ Base.copy(S::SymbolStringCachedContext) = SymbolStringCachedContext(copy(S.paren
 
 function merge_context!(S::SymbolStringCachedContext, other::SymbolStringCachedContext)
     merge!(S.cache, other.cache)
+    merge_context!(S.parent, other.parent)
     return S
 end
