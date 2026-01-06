@@ -476,15 +476,23 @@ end
 end
 
 @testset "hasing dict-like types" begin
-    @test bytes2hex(stable_hash(AbstractDict{Int,Int}, HashVersion{4}())) == "d7ee606d7bf29384a6388718d7b24a318a2ed7f5e7b15e8213fe97c91a85a114"
-    @test bytes2hex(stable_hash(AbstractDict, HashVersion{4}())) == "be9ecb60f5d7e3ccebf34d03509dd6974c37c195053e0636b3bb75e8f5d38bc0"
-    @test bytes2hex(stable_hash(AbstractDict{<:Integer,Int}, HashVersion{4}())) == "2d2ac2ad15b5d830d49ebfe1a8cbf6ced599e5402c4e461b69c2fffd14ecc388"
-    @test bytes2hex(stable_hash(AbstractDict{Int}, HashVersion{4}())) == "af74fc5be9e68f51b54a0c7597a50574980f93f6f14d393c889d854ba07da3a1"
+    @test bytes2hex(stable_hash(AbstractDict{Int,Int}, HashVersion{4}())) ==
+          "d7ee606d7bf29384a6388718d7b24a318a2ed7f5e7b15e8213fe97c91a85a114"
+    @test bytes2hex(stable_hash(AbstractDict, HashVersion{4}())) ==
+          "be9ecb60f5d7e3ccebf34d03509dd6974c37c195053e0636b3bb75e8f5d38bc0"
+    @test bytes2hex(stable_hash(AbstractDict{<:Integer,Int}, HashVersion{4}())) ==
+          "2d2ac2ad15b5d830d49ebfe1a8cbf6ced599e5402c4e461b69c2fffd14ecc388"
+    @test bytes2hex(stable_hash(AbstractDict{Int}, HashVersion{4}())) ==
+          "af74fc5be9e68f51b54a0c7597a50574980f93f6f14d393c889d854ba07da3a1"
 
-    @test bytes2hex(stable_hash(Pair{Int,Int}, HashVersion{4}())) == "5f6afa1ce9eae4df3d49dd076a6f18a95302c5345c2de2d11f4370edf28693c7"
-    @test bytes2hex(stable_hash(Pair, HashVersion{4}())) == "82196b6bb6240a7599463545908eae3e69928b7935445373f901769166f2ddfa"
-    @test bytes2hex(stable_hash(Pair{<:Integer,Int}, HashVersion{4}())) == "858fc1811469919c00a496b7791a6f81538d2ae8a02703982ee1ef547c995375"
-    @test bytes2hex(stable_hash(Pair{Int}, HashVersion{4}())) == "c40d13d2133829184c90e8404026f46117e612d7acdfb321b262197e2df087a0"
+    @test bytes2hex(stable_hash(Pair{Int,Int}, HashVersion{4}())) ==
+          "5f6afa1ce9eae4df3d49dd076a6f18a95302c5345c2de2d11f4370edf28693c7"
+    @test bytes2hex(stable_hash(Pair, HashVersion{4}())) ==
+          "82196b6bb6240a7599463545908eae3e69928b7935445373f901769166f2ddfa"
+    @test bytes2hex(stable_hash(Pair{<:Integer,Int}, HashVersion{4}())) ==
+          "858fc1811469919c00a496b7791a6f81538d2ae8a02703982ee1ef547c995375"
+    @test bytes2hex(stable_hash(Pair{Int}, HashVersion{4}())) ==
+          "c40d13d2133829184c90e8404026f46117e612d7acdfb321b262197e2df087a0"
 end
 
 @testset "Aqua" begin
