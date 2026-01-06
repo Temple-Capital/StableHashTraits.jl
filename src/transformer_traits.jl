@@ -671,7 +671,16 @@ end
 
 is_ordered(x::AbstractDict) = false
 
+_internal_type_structure(::Any) = nothing
+_internal_type_structure(::Type{<:AbstractDict{K}}) where {K} = (K, Any)
+_internal_type_structure(::Type{<:AbstractDict{<:Any,V}}) where {V} = (Any, V)
+_internal_type_structure(::Type{<:AbstractDict{K,V}}) where {K,V} = (K, V)
+_internal_type_structure(::Type{<:Pair{K}}) where {K} = (K, Any)
+_internal_type_structure(::Type{<:Pair{<:Any,V}}) where {V} = (Any, V)
+_internal_type_structure(::Type{<:Pair{K,V}}) where {K,V} = (K, V)
+
 function internal_type_structure(::Type{T}, ::StructTypes.DictType) where {T}
+    isconcretetype(T) || return _internal_type_structure(T)
     return keytype(T), valtype(T)
 end
 
