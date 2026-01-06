@@ -23,7 +23,6 @@ jobs:
         version:
           - 'min'
           - '1.11'
-          - 'pre'
         os:
           - ubuntu-latest
         arch:
