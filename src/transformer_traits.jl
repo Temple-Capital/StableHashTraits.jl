@@ -147,27 +147,29 @@ function hash_type_and_value(::FetchHash, x, hash_state, context)
     end
 end
 
+_transformer_typeof(x, context) = transformer(typeof(x), context)
+_transformer_typeof(::Type, context) = transformer(DataType, context)
 function hash_type_and_value(::ComputeHash, x, hash_state, context)
-    transform = transformer(typeof(x), context)::Transformer
+    transform = _transformer_typeof(x, context)::Transformer
     tx = transform(x)
-    hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform; tx)
+    hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform, tx)
     return hash_state
 end
 
-function hash_type_and_value(::TopDownTraversal, x, hash_state, context, transform::Transformer; tx = transform(x))
+function hash_type_and_value(::TopDownTraversal, x, hash_state, context, transform::Transformer, tx)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
-    hash_state = hash_value(x, hash_state, context, transform; tx = tx)
+    hash_state = hash_value(tx, hash_state, context, transform)
     return hash_state
 end
 
-function hash_type_and_value(::BottomUpTraversal, x, hash_state, context, transform::Transformer; tx = transform(x))
-    hash_state = hash_value(x, hash_state, context, transform; tx = tx)
+function hash_type_and_value(::BottomUpTraversal, x, hash_state, context, transform::Transformer, tx)
+    hash_state = hash_value(tx, hash_state, context, transform)
     hash_state = hash_type!(hash_state, context, x, tx, transform.hoist_type)
     return hash_state
 end
 
 # how we hash when the type hash can be hoisted out of a loop
-function hash_value(x, hash_state, context, transform::Transformer; tx = transform(x))
+function hash_value(tx, hash_state, context, transform::Transformer)
     return stable_hash_helper(tx, hash_state, context, hash_trait(transform, tx))
 end
 
@@ -204,7 +206,7 @@ function type_digest(::Type{T}, hash_state, context) where {T}
     transform = transformer(typeof(T), type_context)
     tT = transform(T)
     hash_type_state = similar_hash_state(hash_state)
-    hash_type_state = hash_value(tT, hash_type_state, type_context, transform; tx = tT)
+    hash_type_state = hash_value(tT, hash_type_state, type_context, transform)
     digest = compute_hash!(hash_type_state)
     return digest
 end
@@ -384,7 +386,7 @@ Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
         FT = fieldtype(typeof(x), field)
         if isconcretetype(FT) && transform.hoist_type && HashRetrievalStrategy(FT) !== FetchHash()
             # the fieldtype has been hashed as part of the type of the container
-            hash_value(val, hash_state, context, transform)
+            hash_value(transform(val), hash_state, context, transform)
         else
             hash_type_and_value(val, hash_state, context)
         end
@@ -493,7 +495,7 @@ function _hash_elements(items, hash_state, context, transform, ::HashAllElements
         # the eltype has already been hashed as part of the type structure of
         # the container
         for x in items
-            hash_value(x, hash_state, context, transform)
+            hash_value(transform(x), hash_state, context, transform)
         end
     else
         for x in items
@@ -615,7 +617,8 @@ function _hash_elements(items, hash_state, context, transform, ::HashSelectedEle
     if type_hoist
         # the eltype has already been hashed as part of the type structure of
         # the container
-        hash_shaped(hash_value, items, hash_state, context, transform)
+        @inline hash_value_helper(x, hash_state, context, transform) = hash_value(transform(x), hash_state, context, transform)
+        hash_shaped(hash_value_helper, items, hash_state, context, transform)
     else
         @inline hash_type_and_value_helper(x, hash_state, context, transform) = hash_type_and_value(x, hash_state, context)
         hash_shaped(hash_type_and_value_helper, items, hash_state, context, transform)
