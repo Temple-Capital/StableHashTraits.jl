@@ -422,7 +422,7 @@ end
     s = SimpleStruct(1,2.0,"c")
     state = StableHashTraits.RecursiveHashState(xxh3_64, UInt(0))
     h = StableHashTraits.stable_hash!(s, state, ctx)
-    @test h == mapfoldr(x -> getfield(s, x), xxh3_64, sort(fieldnames(typeof(s)), rev=true); init=UInt(0))
+    @test h == mapfoldr(x -> getfield(s, x), xxh3_64, sort([fieldnames(typeof(s))...], rev=true); init=UInt(0))
 end
 
 @testset "cached hash" begin
