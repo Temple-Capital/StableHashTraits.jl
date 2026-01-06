@@ -148,7 +148,10 @@ function hash_type_and_value(::FetchHash, x, hash_state, context)
 end
 
 _transformer_typeof(x, context) = transformer(typeof(x), context)
+# split these special cases to improe type-stability
 _transformer_typeof(::Type, context) = transformer(DataType, context)
+_transformer_typeof(::Union, context) = transformer(Union, context)
+_transformer_typeof(::UnionAll, context) = transformer(UnionAll, context)
 function hash_type_and_value(::ComputeHash, x, hash_state, context)
     transform = _transformer_typeof(x, context)::Transformer
     tx = transform(x)
