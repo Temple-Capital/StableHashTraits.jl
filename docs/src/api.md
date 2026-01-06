@@ -19,4 +19,15 @@ StableHashTraits.parent_context
 StableHashTraits.@context
 WithTypeNames
 TablesEq
+StableHashTraits.SymbolStringCachedContext
+StableHashTraits.hash_computed
+StableHashTraits.@hash_retrieval
+StableHashTraits.fetch_hash
+StableHashTraits.as_hash_compatible_input
+StableHashTraits.HashRetrievalStrategy
+StableHashTraits.TraversalStyle
+StableHashTraits.context_hash_state
+StableHashTraits.TypeDigestCachedContext
+StableHashTraits.merge_context!
+StableHashTraits.type_digest
 ```
