@@ -273,10 +273,7 @@ function transformer(::Type{T}, context::TypeHashContext) where {T<:Type}
         transT = transform_type(T, parent_context(context))
         sT = StructType_(T)
         # avoid infinite recursion on recursive structs by skipping the internal structure
-        if sT isa StructTypes.Struct && isrecursivetype(T)
-            return pair_structure(transT, nothing)
-        end
-        return pair_structure(transT, internal_type_structure_(T, sT))
+        return pair_structure(transT, isrecursivetype(T) ? nothing : internal_type_structure_(T, sT))
     end
 end
 @inline StructType_(T) = StructType(T)
