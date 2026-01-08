@@ -666,7 +666,7 @@ end
 
 function stable_hash_helper(x::Tuple, hash_state, context, ::StructTypes.ArrayType)
     return stable_hash_helper_nested(hash_state) do nested_hash_state
-        hash_fields(x, fieldnames(typeof(x)), nested_hash_state, context)
+        return hash_fields(x, fieldnames(typeof(x)), nested_hash_state, context)
     end
 end
 
