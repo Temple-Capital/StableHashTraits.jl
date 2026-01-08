@@ -252,13 +252,8 @@ as_bytes_vector(x::Union{UInt32,UInt64,UInt128}) = collect(reinterpret(NTuple{si
 asarray(x) = [x]
 asarray(x::AbstractArray) = x
 
-struct TypeHashContext{T}
-    parent::T
-    stack::Set{Any}
-end
-TypeHashContext(parent::T) where {T} = TypeHashContext{T}(parent, Set{DataType}())
+@context TypeHashContext
 TypeHashContext(x::TypeHashContext) = x
-parent_context(x::TypeHashContext) = x.parent
 hash_type!(hash_state, ::TypeHashContext, key::Type) = hash_state
 
 # pair_structure: When the internal structure of a type is `nothing`, avoid additional
@@ -268,18 +263,20 @@ hash_type!(hash_state, ::TypeHashContext, key::Type) = hash_state
 # be hashed give its `StructType`).
 pair_structure(x, ::Nothing) = x
 pair_structure(x, y) = (x, y)
+"""
+    isrecursivetype(T)
+
+Indicates whether type `T` is recursive, i.e., its fieldtypes may contain references to `T`.
+"""
+isrecursivetype(T) = false
 function transformer(::Type{T}, context::TypeHashContext) where {T<:Type}
     return Transformer() do T
         transT = transform_type(T, parent_context(context))
         sT = StructType_(T)
         # avoid infinite recursion on recursive structs by skipping the internal structure
-        if sT isa StructTypes.Struct
-            if T in context.stack
-                return pair_structure(transT, nothing)
-            end
-            push!(context.stack, T)
-        end
-        pair_structure(transT, internal_type_structure_(T, sT))
+        return pair_structure(transT,
+                              isrecursivetype(T) ? nothing :
+                              internal_type_structure_(T, sT))
     end
 end
 @inline StructType_(T) = StructType(T)
