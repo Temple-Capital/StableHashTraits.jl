@@ -390,7 +390,8 @@ Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
     hash_state = foldl(fv, init=hash_state) do hash_state, (val, FT)
         # can we optimize away the field's type_hash?
         transform = transformer(typeof(val), context)
-        if isconcretetype(FT) && transform.hoist_type && HashRetrievalStrategy(FT) !== FetchHash()
+        if isconcretetype(FT) && transform.hoist_type &&
+           HashRetrievalStrategy(FT) !== FetchHash()
             # the fieldtype has been hashed as part of the type of the container
             hash_value(transform(val), hash_state, context, transform)
         else
