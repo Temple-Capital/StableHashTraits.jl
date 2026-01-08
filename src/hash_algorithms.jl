@@ -86,7 +86,7 @@ end
 compute_hash!(sha::SHA.SHA_CTX) = SHA.digest!(sha)
 similar_hash_state(::T) where {T<:SHA.SHA_CTX} = T()
 
-mutable struct RecursiveHashState{F,T} <: HashState
+struct RecursiveHashState{F,T} <: HashState
     fn::F
     val::T
     init::T
@@ -95,8 +95,8 @@ function RecursiveHashState(fn, init=fn(UInt8[]))
     return RecursiveHashState(fn, init, init)
 end
 function update_hash!(hasher::RecursiveHashState, bytes)
-    hasher.val = hasher.fn(bytes, hasher.val)
-    return hasher
+    val = hasher.fn(bytes, hasher.val)
+    return RecursiveHashState(hasher.fn, val, hasher.init)
 end
 compute_hash!(x::RecursiveHashState) = x.val
 similar_hash_state(x::RecursiveHashState) = RecursiveHashState(x.fn, x.init, x.init)
