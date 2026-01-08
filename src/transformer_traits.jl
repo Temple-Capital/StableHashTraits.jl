@@ -503,11 +503,11 @@ function _hash_elements(items, hash_state, context, transform, ::HashAllElements
         # the eltype has already been hashed as part of the type structure of
         # the container
         for x in items
-            hash_value(transform(x), hash_state, context, transform)
+            hash_state = hash_value(transform(x), hash_state, context, transform)
         end
     else
         for x in items
-            hash_type_and_value(x, hash_state, context)
+            hash_state = hash_type_and_value(x, hash_state, context)
         end
     end
     return hash_state
@@ -626,10 +626,10 @@ function _hash_elements(items, hash_state, context, transform, ::HashSelectedEle
         # the eltype has already been hashed as part of the type structure of
         # the container
         @inline hash_value_helper(x, hash_state, context, transform) = hash_value(transform(x), hash_state, context, transform)
-        hash_shaped(hash_value_helper, items, hash_state, context, transform)
+        hash_state = hash_shaped(hash_value_helper, items, hash_state, context, transform)
     else
         @inline hash_type_and_value_helper(x, hash_state, context, transform) = hash_type_and_value(x, hash_state, context)
-        hash_shaped(hash_type_and_value_helper, items, hash_state, context, transform)
+        hash_state = hash_shaped(hash_type_and_value_helper, items, hash_state, context, transform)
     end
     return hash_state
 end
