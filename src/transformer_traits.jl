@@ -386,7 +386,7 @@ Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
     vals = map(field -> getfield(x, field), fields)
     fT = map(field -> fieldtype(typeof(x), field), fields)
     fv = ntuple(length(fields)) do i
-        (vals[i], fT[i])
+        return (vals[i], fT[i])
     end
     hash_state = foldl(fv, init=hash_state) do hash_state, (val, FT)
         # can we optimize away the field's type_hash?
