@@ -30,4 +30,5 @@ StableHashTraits.context_hash_state
 StableHashTraits.TypeDigestCachedContext
 StableHashTraits.merge_context!
 StableHashTraits.type_digest
+StableHashTraits.isrecursivetype
 ```
