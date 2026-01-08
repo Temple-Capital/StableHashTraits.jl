@@ -155,7 +155,8 @@ _transformer_typeof(::UnionAll, context) = transformer(UnionAll, context)
 function hash_type_and_value(::ComputeHash, x, hash_state, context)
     transform = _transformer_typeof(x, context)::Transformer
     tx = transform(x)
-    hash_state = hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform, tx)
+    hash_state = hash_type_and_value(TraversalStyle(context), x, hash_state, context,
+                                     transform, tx)
     return hash_state
 end
 
