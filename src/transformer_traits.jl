@@ -388,7 +388,7 @@ Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
     fv = ntuple(length(fields)) do i
         return (vals[i], fT[i])
     end
-    hash_state = foldl(fv, init=hash_state) do hash_state, (val, FT)
+    hash_state = foldl(fv; init=hash_state) do hash_state, (val, FT)
         # can we optimize away the field's type_hash?
         transform = transformer(typeof(val), context)
         if isconcretetype(FT) && transform.hoist_type &&
