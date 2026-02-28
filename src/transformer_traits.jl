@@ -155,7 +155,8 @@ _transformer_typeof(::UnionAll, context) = transformer(UnionAll, context)
 function hash_type_and_value(::ComputeHash, x, hash_state, context)
     transform = _transformer_typeof(x, context)::Transformer
     tx = transform(x)
-    hash_type_and_value(TraversalStyle(context), x, hash_state, context, transform, tx)
+    hash_state = hash_type_and_value(TraversalStyle(context), x, hash_state, context,
+                                     transform, tx)
     return hash_state
 end
 
@@ -380,11 +381,15 @@ end
 
 Base.@constprop :aggressive function hash_fields(x, fields, hash_state, context)
     vals = map(field -> getfield(x, field), fields)
-    map(fields, vals) do field, val
+    fT = map(field -> fieldtype(typeof(x), field), fields)
+    fv = ntuple(length(fields)) do i
+        return (vals[i], fT[i])
+    end
+    hash_state = foldl(fv; init=hash_state) do hash_state, (val, FT)
         # can we optimize away the field's type_hash?
         transform = transformer(typeof(val), context)
-        FT = fieldtype(typeof(x), field)
-        if isconcretetype(FT) && transform.hoist_type && HashRetrievalStrategy(FT) !== FetchHash()
+        if isconcretetype(FT) && transform.hoist_type &&
+           HashRetrievalStrategy(FT) !== FetchHash()
             # the fieldtype has been hashed as part of the type of the container
             hash_value(transform(val), hash_state, context, transform)
         else
@@ -495,11 +500,11 @@ function _hash_elements(items, hash_state, context, transform, ::HashAllElements
         # the eltype has already been hashed as part of the type structure of
         # the container
         for x in items
-            hash_value(transform(x), hash_state, context, transform)
+            hash_state = hash_value(transform(x), hash_state, context, transform)
         end
     else
         for x in items
-            hash_type_and_value(x, hash_state, context)
+            hash_state = hash_type_and_value(x, hash_state, context)
         end
     end
     return hash_state
@@ -618,10 +623,10 @@ function _hash_elements(items, hash_state, context, transform, ::HashSelectedEle
         # the eltype has already been hashed as part of the type structure of
         # the container
         @inline hash_value_helper(x, hash_state, context, transform) = hash_value(transform(x), hash_state, context, transform)
-        hash_shaped(hash_value_helper, items, hash_state, context, transform)
+        hash_state = hash_shaped(hash_value_helper, items, hash_state, context, transform)
     else
         @inline hash_type_and_value_helper(x, hash_state, context, transform) = hash_type_and_value(x, hash_state, context)
-        hash_shaped(hash_type_and_value_helper, items, hash_state, context, transform)
+        hash_state = hash_shaped(hash_type_and_value_helper, items, hash_state, context, transform)
     end
     return hash_state
 end
@@ -658,7 +663,7 @@ end
 
 function stable_hash_helper(x::Tuple, hash_state, context, ::StructTypes.ArrayType)
     return stable_hash_helper_nested(hash_state) do nested_hash_state
-        nested_hash_state = hash_fields(x, fieldnames(typeof(x)), nested_hash_state, context)
+        return hash_fields(x, fieldnames(typeof(x)), nested_hash_state, context)
     end
 end
 
